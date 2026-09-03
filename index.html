@@ -3,214 +3,68 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>家事の入力</title>
-  <!-- LINE LIFF SDK の読み込み -->
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <title>家事選択</title>
   <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      padding: 16px;
-      margin: 0;
-      background-color: #f4f5f7;
-      color: #333;
-    }
-    h2 {
-      font-size: 1.25rem;
-      margin-top: 0;
-      margin-bottom: 16px;
-      color: #111;
-      text-align: center;
-    }
-    .status-msg {
-      text-align: center;
-      padding: 20px;
-      color: #666;
-      font-size: 0.95rem;
-    }
-    .item-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    .item {
-      background: #ffffff;
-      padding: 14px 16px;
-      border-radius: 10px;
-      font-size: 1.05rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-      display: flex;
-      align-items: center;
-    }
-    .item label {
-      width: 100%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .item input[type="checkbox"] {
-      width: 20px;
-      height: 20px;
-      accent-color: #06C755;
-    }
+    body { font-family: sans-serif; padding: 20px; text-align: center; background: #f4f5f7; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; }
     button {
-      width: 100%;
-      padding: 14px;
-      background: #06C755;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 1.05rem;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background-color 0.2s;
+      padding: 20px 10px; font-size: 16px; font-weight: bold; color: #06C755;
+      background: #fff; border: 2px solid #06C755; border-radius: 10px; cursor: pointer;
     }
-    button:active {
-      background: #05b34c;
-    }
-    button:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
+    button:disabled { opacity: 0.5; border-color: #ccc; color: #ccc; cursor: not-allowed; }
+    #status { margin-bottom: 10px; font-weight: bold; color: #555; }
   </style>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
 
-  <h2 id="title">今日やった家事を選択</h2>
+  <div id="status">画面を準備中...</div>
 
-  <!-- 状態表示エリア（初期読み込み時 / エラー時） -->
-  <div id="status" class="status-msg">家事リストを読み込んでいます...</div>
-
-  <!-- 家事チェックボックスの一覧描画エリア -->
-  <div id="choreListContainer" class="item-list"></div>
-
-  <!-- 登録ボタン -->
-  <button id="submitBtn" style="display: none;">登録する</button>
+  <div class="grid">
+    <button class="chore-btn" onclick="sendChore('洗濯')" disabled>🧺 洗濯</button>
+    <button class="chore-btn" onclick="sendChore('掃除')" disabled>🧹 掃除</button>
+    <button class="chore-btn" onclick="sendChore('食器洗い')" disabled>🍽️ 食器洗い</button>
+    <button class="chore-btn" onclick="sendChore('ゴミ出し')" disabled>🗑️ ゴミ出し</button>
+  </div>
 
   <script>
-    // ==========================================
-    // 設定項目（各自の環境に合わせて書き換えてください）
-    // ==========================================
-    const LIFF_ID = '2011237766;
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzlAFbG5mz0uS1s-I5TjM3foKAIzvOSsnYHsoSBnLRod4VlVJeL3n5lVYxfomUEfHyQrg/exec';
+    const MY_LIFF_ID = "2011411807-WdTV4hX7";
+    let isReady = false;
 
-    let currentGroupId = '';
+    window.onload = function() {
+      const statusEl = document.getElementById('status');
 
-    // LIFF の初期化
-    liff.init({ liffId: LIFF_ID })
-      .then(() => {
-        if (!liff.isLoggedIn()) {
-          liff.login();
-        } else {
-          // コンテキスト（起動元の情報）を取得
-          const context = liff.getContext();
-          
-          // グループトーク内から開かれた場合、groupId を取得
-          currentGroupId = context ? (context.groupId || context.roomId || '') : '';
-
-          if (currentGroupId) {
-            // グループIDをもとに動的マスタ取得
-            fetchHouseworkMaster(currentGroupId);
-          } else {
-            // 1対1トーク画面やブラウザから開かれた場合
-            showStatus('※グループトーク内のリッチメニュー等から起動してください。');
-          }
-        }
-      })
-      .catch((err) => {
-        showStatus('LIFFの初期化に失敗しました: ' + err.message);
-      });
-
-    /**
-     * GASからグループ専用の家事マスタを取得して描画
-     */
-    function fetchHouseworkMaster(groupId) {
-      fetch(`${GAS_URL}?groupId=${encodeURIComponent(groupId)}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === 'success' && data.chores && data.chores.length > 0) {
-            renderChoreList(data.chores);
-          } else {
-            showStatus('このグループに登録されている家事マスタがありません。');
-          }
-        })
-        .catch(err => {
-          showStatus('データの通信に失敗しました。');
-          console.error(err);
-        });
-    }
-
-    /**
-     * 家事チェックボックスの動的レンダリング
-     */
-    function renderChoreList(chores) {
-      const container = document.getElementById('choreListContainer');
-      container.innerHTML = '';
-
-      chores.forEach(chore => {
-        const div = document.createElement('div');
-        div.className = 'item';
-        div.innerHTML = `
-          <label>
-            <input type="checkbox" name="chore" value="${chore}">
-            <span>${chore}</span>
-          </label>
-        `;
-        container.appendChild(div);
-      });
-
-      // 読み込みメッセージを非表示にしてボタンを表示
-      document.getElementById('status').style.display = 'none';
-      document.getElementById('submitBtn').style.display = 'block';
-    }
-
-    /**
-     * 送信処理（liff.sendMessages でユーザー発言として送信 ＝ Reply API 無料化）
-     */
-    document.getElementById('submitBtn').addEventListener('click', () => {
-      const checkedElements = document.querySelectorAll('input[name="chore"]:checked');
-      const checkedChores = Array.from(checkedElements).map(el => el.value);
-
-      if (checkedChores.length === 0) {
-        alert('家事を1つ以上選択してください。');
+      if (typeof liff === 'undefined') {
+        statusEl.innerText = "エラー: LIFF SDKが読み込めません";
         return;
       }
 
-      // 送信ボタンの二重タップ防止
-      const submitBtn = document.getElementById('submitBtn');
-      submitBtn.disabled = true;
-      submitBtn.textContent = '送信中...';
+      liff.init({ liffId: MY_LIFF_ID })
+        .then(() => {
+          isReady = true;
+          statusEl.innerText = "家事を選択してください";
+          document.querySelectorAll('.chore-btn').forEach(btn => btn.disabled = false);
+        })
+        .catch((err) => {
+          statusEl.innerText = "初期化失敗: " + err.message;
+        });
+    };
 
-      // トーク画面へ投稿するメッセージ文面を作成
-      const messageText = `🧹 【家事完了】\n${checkedChores.join('\n')}`;
+    function sendChore(choreName) {
+      if (!isReady) return;
 
-      // ユーザー端末からトーク画面へ自動送信
-      liff.sendMessages([
-        {
-          type: 'text',
-          text: messageText
-        }
-      ])
-      .then(() => {
-        // 送信成功したら LIFF 画面を即座に閉じる
-        liff.closeWindow();
-      })
-      .catch((err) => {
-        alert('メッセージの送信に失敗しました: ' + err.message);
-        submitBtn.disabled = false;
-        submitBtn.textContent = '登録する';
-      });
-    });
+      if (!liff.isInClient()) {
+        alert("LINEアプリ内のトーク画面から開いてください。");
+        return;
+      }
 
-    /**
-     * エラーメッセージ等の表示用メッセージ切り替え
-     */
-    function showStatus(msg) {
-      const statusDiv = document.getElementById('status');
-      statusDiv.textContent = msg;
-      statusDiv.style.display = 'block';
+      liff.sendMessages([{ type: 'text', text: choreName }])
+        .then(() => {
+          liff.closeWindow();
+        })
+        .catch((err) => {
+          alert("送信エラー: " + err.message);
+        });
     }
   </script>
 </body>
