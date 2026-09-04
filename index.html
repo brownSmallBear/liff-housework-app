@@ -10,7 +10,7 @@
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 16px 16px 80px 16px; /* フッター固定用の下部余白 */
+      padding: 16px 16px 80px 16px; /* フッター用の余白 */
       margin: 0;
       background-color: #f4f5f7;
     }
@@ -46,19 +46,15 @@
       user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
-    .chore-card:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
 
-    /* 選択状態のスタイル */
+    /* 選択状態（LINEグリーン背景） */
     .chore-card.selected {
       background-color: #06C755;
       border-color: #06C755;
       color: #ffffff;
     }
 
-    /* 選択時のチェックマーク */
+    /* チェックアイコン */
     .chore-card .check-icon {
       display: none;
       position: absolute;
@@ -106,48 +102,12 @@
 </head>
 <body>
 
-  <div id="status">画面を準備中...</div>
+  <div id="status">家事マスタを読み込み中...</div>
 
-  <div class="grid">
-    <button class="chore-card" onclick="toggleSelect(this, '朝食準備')" disabled>
-      <span class="check-icon">✓</span>
-      <span class="name">朝食準備</span>
-    </button>
-    <button class="chore-card" onclick="toggleSelect(this, '夕食調理')" disabled>
-      <span class="check-icon">✓</span>
-      <span class="name">夕食調理</span>
-    </button>
-    <button class="chore-card" onclick="toggleSelect(this, '食器洗い')" disabled>
-      <span class="check-icon">✓</span>
-      <span class="name">食器洗い</span>
-    </button>
-    <button class="chore-card" onclick="toggleSelect(this, '食洗機セット・片付け')" disabled>
-      <span class="check-icon">✓</span>
-      <span class="name">食洗機セット・片付け</span>
-    </button>
-    <button class="chore-card" onclick="toggleSelect(this, '麦茶')" disabled>
-      <span class="check-icon">✓</span>
-      <span class="name">麦茶</span>
-    </button>
-    <button class="chore-card" onclick="toggleSelect(this, '洗濯・干し')" disabled>
-      <span class="check-icon">✓</span>
-      <span class="name">洗濯・干し</span>
-    </button>
-    <button class="chore-card" onclick="toggleSelect(this, '洗濯畳み・収納')" disabled>
-      <span class="check-icon">✓</span>
-      <span class="name">洗濯畳み・収納</span>
-    </button>
-    <button class="chore-card" onclick="toggleSelect(this, 'お風呂掃除')" disabled>
-      <span class="check-icon">✓</span>
-      <span class="name">お風呂掃除</span>
-    </button>
-    <button class="chore-card" onclick="toggleSelect(this, 'ゴミ集め・ゴミ出し')" disabled>
-      <span class="check-icon">✓</span>
-      <span class="name">ゴミ集め・ゴミ出し</span>
-    </button>
-  </div>
+  <!-- ここに取得した家事マスタが動的に入ります -->
+  <div class="grid" id="choreGrid"></div>
 
-  <!-- 下部固定の送信エリア -->
+  <!-- 固定フッター送信エリア -->
   <div class="footer">
     <button id="submitBtn" class="submit-btn" disabled onclick="sendChores()">
       家事を記録する (0)
@@ -156,6 +116,9 @@
 
   <script>
     const MY_LIFF_ID = "2011411807-WdTV4hX7";
+    // ★デプロイしたGASのWebアプリURLを設定してください
+    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzlAFbG5mz0uS1s-I5TjM3foKAIzvOSsnYHsoSBnLRod4VlVJeL3n5lVYxfomUEfHyQrg/exec";
+
     let isReady = false;
     const selectedChores = new Set();
 
@@ -169,16 +132,59 @@
 
       liff.init({ liffId: MY_LIFF_ID })
         .then(() => {
-          isReady = true;
-          statusEl.innerText = "家事を複数選択できます";
-          document.querySelectorAll('.chore-card').forEach(btn => btn.disabled = false);
+          // コンテキストからグループIDを取得
+          const context = liff.getContext();
+          const groupId = context ? (context.groupId || context.roomId || context.userId || '') : '';
+
+          // GASから該当グループの家事マスタを取得
+          fetchGroupChores(groupId);
         })
         .catch((err) => {
           statusEl.innerText = "初期化失敗: " + err.message;
         });
     };
 
-    // 家事カードの選択 / 解除 切り替え
+    // GASからグループ専用の家事マスタを取得
+    function fetchGroupChores(groupId) {
+      const statusEl = document.getElementById('status');
+      const url = `${GAS_WEB_APP_URL}?action=getChores&groupId=${encodeURIComponent(groupId)}`;
+
+      fetch(url)
+        .then(response => response.json())
+        .then(chores => {
+          if (Array.isArray(chores) && chores.length > 0) {
+            renderCards(chores);
+            isReady = true;
+            statusEl.innerText = "家事を選択してください（複数可）";
+          } else {
+            statusEl.innerText = "登録されている家事マスタがありません";
+          }
+        })
+        .catch(err => {
+          console.error("マスタ取得エラー:", err);
+          statusEl.innerText = "家事マスタの取得に失敗しました";
+        });
+    }
+
+    // 家事カードを動的に生成
+    function renderCards(chores) {
+      const grid = document.getElementById('choreGrid');
+      grid.innerHTML = ''; // クリア
+
+      chores.forEach(choreName => {
+        const btn = document.createElement('button');
+        btn.className = 'chore-card';
+        btn.onclick = () => toggleSelect(btn, choreName);
+
+        btn.innerHTML = `
+          <span class="check-icon">✓</span>
+          <span class="name">${choreName}</span>
+        `;
+        grid.appendChild(btn);
+      });
+    }
+
+    // 選択・解除切り替え
     function toggleSelect(element, choreName) {
       if (!isReady) return;
 
@@ -192,7 +198,7 @@
       updateSubmitButton();
     }
 
-    // フッターボタンの表示・カウント更新
+    // 送信ボタンの状態更新
     function updateSubmitButton() {
       const submitBtn = document.getElementById('submitBtn');
       const count = selectedChores.size;
@@ -217,12 +223,12 @@
 
       if (selectedChores.size === 0) return;
 
-      // 選択した家事名を改行で繋ぐ（例: "朝食準備\n食器洗い"）[cite: 1]
+      // 改行区切りで結合（GAS側で一括分解される）
       const textToSend = Array.from(selectedChores).join('\n');
 
       liff.sendMessages([{ type: 'text', text: textToSend }])
         .then(() => {
-          liff.closeWindow(); // 送信完了後に自動で閉じる[cite: 1]
+          liff.closeWindow();
         })
         .catch((err) => {
           alert("送信エラー: " + err.message);
