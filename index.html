@@ -15,8 +15,19 @@
     #status {
       margin-bottom: 12px;
       font-weight: bold;
-      color: #555;
+      color: #333;
       text-align: center;
+      word-break: break-all;
+    }
+    /* エラー表示用のスタイル */
+    .error-msg {
+      color: #d93025;
+      background: #fce8e6;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #fad2cf;
+      margin-bottom: 12px;
+      font-size: 13px;
     }
 
     /* タブエリア */
@@ -106,7 +117,7 @@
 </head>
 <body>
 
-  <div id="status">家事マスタを読み込み中...</div>
+  <div id="status">システム初期化中...</div>
 
   <!-- カテゴリタブ -->
   <div class="category-tabs" id="categoryTabs"></div>
@@ -122,8 +133,17 @@
   </div>
 
   <script>
+    // エラーログを画面に直接出す設定
+    window.onerror = function(msg, url, line) {
+      const statusEl = document.getElementById('status');
+      statusEl.className = 'error-msg';
+      statusEl.innerText = "JSエラーが発生しました:\n" + msg + "\n(LINE: " + line + ")";
+      return false;
+    };
+
     const MY_LIFF_ID = "2011411807-WdTV4hX7";
-    // ★ここをご自身のGASウェブアプリURLに置き換えてください
+    
+    // ★★★ 注意: クォーテーションを重ねず、以下のように正しく記述してください ★★★
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzlAFbG5mz0uS1s-I5TjM3foKAIzvOSsnYHsoSBnLRod4VlVJeL3n5lVYxfomUEfHyQrg/exec";
 
     let allChores = [];
@@ -132,7 +152,7 @@
 
     window.onload = function() {
       if (typeof liff === 'undefined') {
-        document.getElementById('status').innerText = "エラー: LIFF SDKが読み込めません";
+        document.getElementById('status').innerText = "エラー: LIFF SDKの読み込みに失敗しました";
         return;
       }
 
@@ -140,10 +160,14 @@
         .then(() => {
           const context = liff.getContext();
           const groupId = context ? (context.groupId || context.roomId || context.userId || '') : '';
+          
+          document.getElementById('status').innerText = "データ取得中...";
           fetchGroupChores(groupId);
         })
         .catch(err => {
-          document.getElementById('status').innerText = "初期化失敗: " + err.message;
+          const statusEl = document.getElementById('status');
+          statusEl.className = 'error-msg';
+          statusEl.innerText = "LIFF初期化エラー: " + err.message;
         });
     };
 
@@ -157,15 +181,16 @@
           if (Array.isArray(data) && data.length > 0) {
             allChores = data;
             statusEl.innerText = "家事を選択してください（複数可）";
+            statusEl.className = '';
             renderCategories();
             renderCards();
           } else {
-            statusEl.innerText = "家事マスタが登録されていません";
+            statusEl.innerText = "家事マスタが登録されていません (データ数: 0)";
           }
         })
         .catch(err => {
-          console.error("取得エラー:", err);
-          statusEl.innerText = "データ取得エラーが発生しました: " + err.message;
+          statusEl.className = 'error-msg';
+          statusEl.innerText = "通信エラー: " + err.message;
         });
     }
 
@@ -173,7 +198,6 @@
       const tabsContainer = document.getElementById('categoryTabs');
       tabsContainer.innerHTML = '';
 
-      // カテゴリ一覧を抽出（重複除去）
       const categories = ['すべて'];
       allChores.forEach(item => {
         if (item.category && !categories.includes(item.category)) {
