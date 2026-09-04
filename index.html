@@ -5,14 +5,102 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>家事選択</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; text-align: center; background: #f4f5f7; }
-    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; }
-    button {
-      padding: 20px 10px; font-size: 16px; font-weight: bold; color: #06C755;
-      background: #fff; border: 2px solid #06C755; border-radius: 10px; cursor: pointer;
+    * {
+      box-sizing: border-box;
     }
-    button:disabled { opacity: 0.5; border-color: #ccc; color: #ccc; cursor: not-allowed; }
-    #status { margin-bottom: 10px; font-weight: bold; color: #555; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 16px 16px 80px 16px; /* フッター固定用の下部余白 */
+      margin: 0;
+      background-color: #f4f5f7;
+    }
+    #status {
+      margin-bottom: 16px;
+      font-weight: bold;
+      color: #555;
+      text-align: center;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    /* カード型ボタン（選択前） */
+    .chore-card {
+      background: #ffffff;
+      border: 2px solid #e0e0e0;
+      color: #333;
+      border-radius: 12px;
+      padding: 16px 10px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      min-height: 64px;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .chore-card:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* 選択状態のスタイル */
+    .chore-card.selected {
+      background-color: #06C755;
+      border-color: #06C755;
+      color: #ffffff;
+    }
+
+    /* 選択時のチェックマーク */
+    .chore-card .check-icon {
+      display: none;
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .chore-card.selected .check-icon {
+      display: block;
+    }
+
+    /* 画面下部固定フッター */
+    .footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #ffffff;
+      padding: 12px 16px;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+      display: flex;
+      justify-content: center;
+      z-index: 100;
+    }
+    .submit-btn {
+      width: 100%;
+      max-width: 400px;
+      background-color: #06C755;
+      color: #ffffff;
+      border: none;
+      border-radius: 24px;
+      padding: 14px 0;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .submit-btn:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -21,20 +109,55 @@
   <div id="status">画面を準備中...</div>
 
   <div class="grid">
-    <button class="chore-btn" onclick="sendChore('朝食準備')" disabled>朝食準備</button>
-    <button class="chore-btn" onclick="sendChore('夕食調理')" disabled>夕食調理</button>
-    <button class="chore-btn" onclick="sendChore('食器洗い')" disabled>食器洗い</button>   
-    <button class="chore-btn" onclick="sendChore('食洗機セット・片付け')" disabled>食洗機セット・片付け</button>
-    <button class="chore-btn" onclick="sendChore('麦茶')" disabled>麦茶</button>
-    <button class="chore-btn" onclick="sendChore('洗濯・干し')" disabled>洗濯・干し</button>
-    <button class="chore-btn" onclick="sendChore('洗濯畳み・収納')" disabled>洗濯畳み・収納</button>
-    <button class="chore-btn" onclick="sendChore('お風呂掃除')" disabled>お風呂掃除</button>
-    <button class="chore-btn" onclick="sendChore('ゴミ集め・ゴミ出し')" disabled>ゴミ集め・ゴミ出し</button>
+    <button class="chore-card" onclick="toggleSelect(this, '朝食準備')" disabled>
+      <span class="check-icon">✓</span>
+      <span class="name">朝食準備</span>
+    </button>
+    <button class="chore-card" onclick="toggleSelect(this, '夕食調理')" disabled>
+      <span class="check-icon">✓</span>
+      <span class="name">夕食調理</span>
+    </button>
+    <button class="chore-card" onclick="toggleSelect(this, '食器洗い')" disabled>
+      <span class="check-icon">✓</span>
+      <span class="name">食器洗い</span>
+    </button>
+    <button class="chore-card" onclick="toggleSelect(this, '食洗機セット・片付け')" disabled>
+      <span class="check-icon">✓</span>
+      <span class="name">食洗機セット・片付け</span>
+    </button>
+    <button class="chore-card" onclick="toggleSelect(this, '麦茶')" disabled>
+      <span class="check-icon">✓</span>
+      <span class="name">麦茶</span>
+    </button>
+    <button class="chore-card" onclick="toggleSelect(this, '洗濯・干し')" disabled>
+      <span class="check-icon">✓</span>
+      <span class="name">洗濯・干し</span>
+    </button>
+    <button class="chore-card" onclick="toggleSelect(this, '洗濯畳み・収納')" disabled>
+      <span class="check-icon">✓</span>
+      <span class="name">洗濯畳み・収納</span>
+    </button>
+    <button class="chore-card" onclick="toggleSelect(this, 'お風呂掃除')" disabled>
+      <span class="check-icon">✓</span>
+      <span class="name">お風呂掃除</span>
+    </button>
+    <button class="chore-card" onclick="toggleSelect(this, 'ゴミ集め・ゴミ出し')" disabled>
+      <span class="check-icon">✓</span>
+      <span class="name">ゴミ集め・ゴミ出し</span>
+    </button>
+  </div>
+
+  <!-- 下部固定の送信エリア -->
+  <div class="footer">
+    <button id="submitBtn" class="submit-btn" disabled onclick="sendChores()">
+      家事を記録する (0)
+    </button>
   </div>
 
   <script>
     const MY_LIFF_ID = "2011411807-WdTV4hX7";
     let isReady = false;
+    const selectedChores = new Set();
 
     window.onload = function() {
       const statusEl = document.getElementById('status');
@@ -47,15 +170,44 @@
       liff.init({ liffId: MY_LIFF_ID })
         .then(() => {
           isReady = true;
-          statusEl.innerText = "家事を選択してください";
-          document.querySelectorAll('.chore-btn').forEach(btn => btn.disabled = false);
+          statusEl.innerText = "家事を複数選択できます";
+          document.querySelectorAll('.chore-card').forEach(btn => btn.disabled = false);
         })
         .catch((err) => {
           statusEl.innerText = "初期化失敗: " + err.message;
         });
     };
 
-    function sendChore(choreName) {
+    // 家事カードの選択 / 解除 切り替え
+    function toggleSelect(element, choreName) {
+      if (!isReady) return;
+
+      if (selectedChores.has(choreName)) {
+        selectedChores.delete(choreName);
+        element.classList.remove('selected');
+      } else {
+        selectedChores.add(choreName);
+        element.classList.add('selected');
+      }
+      updateSubmitButton();
+    }
+
+    // フッターボタンの表示・カウント更新
+    function updateSubmitButton() {
+      const submitBtn = document.getElementById('submitBtn');
+      const count = selectedChores.size;
+
+      if (count > 0) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = `家事を記録する (${count})`;
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.textContent = `家事を記録する (0)`;
+      }
+    }
+
+    // 選択された家事を一括送信
+    function sendChores() {
       if (!isReady) return;
 
       if (!liff.isInClient()) {
@@ -63,9 +215,14 @@
         return;
       }
 
-      liff.sendMessages([{ type: 'text', text: choreName }])
+      if (selectedChores.size === 0) return;
+
+      // 選択した家事名を改行で繋ぐ（例: "朝食準備\n食器洗い"）[cite: 1]
+      const textToSend = Array.from(selectedChores).join('\n');
+
+      liff.sendMessages([{ type: 'text', text: textToSend }])
         .then(() => {
-          liff.closeWindow();
+          liff.closeWindow(); // 送信完了後に自動で閉じる[cite: 1]
         })
         .catch((err) => {
           alert("送信エラー: " + err.message);
