@@ -5,28 +5,52 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>家事選択</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 16px 16px 80px 16px; /* フッター用の余白 */
+      padding: 16px 16px 80px 16px;
       margin: 0;
       background-color: #f4f5f7;
     }
     #status {
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       font-weight: bold;
       color: #555;
       text-align: center;
     }
+
+    /* ① カテゴリ選択タブエリア */
+    .category-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .tab-btn {
+      background: #ffffff;
+      border: 1px solid #ccc;
+      color: #666;
+      border-radius: 16px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: bold;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #06C755;
+      border-color: #06C755;
+      color: #ffffff;
+    }
+
+    /* ② 家事カード一覧エリア */
     .grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 10px;
     }
-
-    /* カード型ボタン（選択前） */
     .chore-card {
       background: #ffffff;
       border: 2px solid #e0e0e0;
@@ -36,43 +60,30 @@
       font-size: 15px;
       font-weight: bold;
       cursor: pointer;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-      transition: all 0.2s ease;
+      position: relative;
+      min-height: 64px;
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
-      min-height: 64px;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
     }
-
-    /* 選択状態（LINEグリーン背景） */
     .chore-card.selected {
       background-color: #06C755;
       border-color: #06C755;
       color: #ffffff;
     }
-
-    /* チェックアイコン */
     .chore-card .check-icon {
       display: none;
       position: absolute;
       top: 6px;
       right: 8px;
       font-size: 12px;
-      font-weight: bold;
     }
-    .chore-card.selected .check-icon {
-      display: block;
-    }
+    .chore-card.selected .check-icon { display: block; }
 
-    /* 画面下部固定フッター */
+    /* 下部固定フッター */
     .footer {
       position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
+      bottom: 0; left: 0; right: 0;
       background: #ffffff;
       padding: 12px 16px;
       box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
@@ -81,22 +92,13 @@
       z-index: 100;
     }
     .submit-btn {
-      width: 100%;
-      max-width: 400px;
-      background-color: #06C755;
-      color: #ffffff;
-      border: none;
-      border-radius: 24px;
-      padding: 14px 0;
-      font-size: 16px;
-      font-weight: bold;
+      width: 100%; max-width: 400px;
+      background-color: #06C755; color: #ffffff;
+      border: none; border-radius: 24px;
+      padding: 14px 0; font-size: 16px; font-weight: bold;
       cursor: pointer;
-      transition: opacity 0.2s;
     }
-    .submit-btn:disabled {
-      background-color: #ccc;
-      cursor: not-allowed;
-    }
+    .submit-btn:disabled { background-color: #ccc; cursor: not-allowed; }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -104,10 +106,13 @@
 
   <div id="status">家事マスタを読み込み中...</div>
 
-  <!-- ここに取得した家事マスタが動的に入ります -->
+  <!-- カテゴリタブ一覧エリア -->
+  <div class="category-tabs" id="categoryTabs"></div>
+
+  <!-- 家事カード一覧エリア -->
   <div class="grid" id="choreGrid"></div>
 
-  <!-- 固定フッター送信エリア -->
+  <!-- 送信ボタン -->
   <div class="footer">
     <button id="submitBtn" class="submit-btn" disabled onclick="sendChores()">
       家事を記録する (0)
@@ -116,78 +121,90 @@
 
   <script>
     const MY_LIFF_ID = "2011411807-WdTV4hX7";
-    // ★デプロイしたGASのWebアプリURLを設定してください
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzlAFbG5mz0uS1s-I5TjM3foKAIzvOSsnYHsoSBnLRod4VlVJeL3n5lVYxfomUEfHyQrg/exec";
 
-    let isReady = false;
-    const selectedChores = new Set();
+    let allChores = [];             // 取得した全家事データ { name, category }
+    let currentCategory = 'すべて';  // 現在選択中のカテゴリ
+    const selectedChores = new Set(); // 選択中の家事名Set
 
     window.onload = function() {
-      const statusEl = document.getElementById('status');
+      if (typeof liff === 'undefined') return;
 
-      if (typeof liff === 'undefined') {
-        statusEl.innerText = "エラー: LIFF SDKが読み込めません";
-        return;
-      }
-
-      liff.init({ liffId: MY_LIFF_ID })
-        .then(() => {
-          // コンテキストからグループIDを取得
-          const context = liff.getContext();
-          const groupId = context ? (context.groupId || context.roomId || context.userId || '') : '';
-
-          // GASから該当グループの家事マスタを取得
-          fetchGroupChores(groupId);
-        })
-        .catch((err) => {
-          statusEl.innerText = "初期化失敗: " + err.message;
-        });
+      liff.init({ liffId: MY_LIFF_ID }).then(() => {
+        const context = liff.getContext();
+        const groupId = context ? (context.groupId || context.roomId || context.userId || '') : '';
+        fetchGroupChores(groupId);
+      });
     };
 
-    // GASからグループ専用の家事マスタを取得
     function fetchGroupChores(groupId) {
       const statusEl = document.getElementById('status');
       const url = `${GAS_WEB_APP_URL}?action=getChores&groupId=${encodeURIComponent(groupId)}`;
 
       fetch(url)
-        .then(response => response.json())
-        .then(chores => {
-          if (Array.isArray(chores) && chores.length > 0) {
-            renderCards(chores);
-            isReady = true;
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data) && data.length > 0) {
+            allChores = data;
             statusEl.innerText = "家事を選択してください（複数可）";
+            renderCategories();
+            renderCards();
           } else {
-            statusEl.innerText = "登録されている家事マスタがありません";
+            statusEl.innerText = "家事マスタが登録されていません";
           }
-        })
-        .catch(err => {
-          console.error("マスタ取得エラー:", err);
-          statusEl.innerText = "家事マスタの取得に失敗しました";
         });
     }
 
-    // 家事カードを動的に生成
-    function renderCards(chores) {
-      const grid = document.getElementById('choreGrid');
-      grid.innerHTML = ''; // クリア
+    // ① カテゴリタブの動的生成
+    function renderCategories() {
+      const tabsContainer = document.getElementById('categoryTabs');
+      tabsContainer.innerHTML = '';
 
-      chores.forEach(choreName => {
+      // 重複なしのカテゴリ一覧を作成（先頭に「すべて」を追加）
+      const categories = ['すべて', ...new Set(allChores.map(c => c.category))];
+
+      categories.forEach(cat => {
         const btn = document.createElement('button');
-        btn.className = 'chore-card';
-        btn.onclick = () => toggleSelect(btn, choreName);
+        btn.className = `tab-btn ${cat === currentCategory ? 'active' : ''}`;
+        btn.textContent = cat;
+        btn.onclick = () => {
+          currentCategory = cat;
+          // タブのアクティブ表示切替
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          // カード一覧を再描画
+          renderCards();
+        };
+        tabsContainer.appendChild(btn);
+      });
+    }
+
+    // ② 家事カードの表示（絞り込み表示）
+    function renderCards() {
+      const grid = document.getElementById('choreGrid');
+      grid.innerHTML = '';
+
+      // 選択中カテゴリに合わせてフィルタリング
+      const filtered = currentCategory === 'すべて' 
+        ? allChores 
+        : allChores.filter(c => c.category === currentCategory);
+
+      filtered.forEach(item => {
+        const btn = document.createElement('button');
+        const isSelected = selectedChores.has(item.name);
+        btn.className = `chore-card ${isSelected ? 'selected' : ''}`;
+        btn.onclick = () => toggleSelect(btn, item.name);
 
         btn.innerHTML = `
           <span class="check-icon">✓</span>
-          <span class="name">${choreName}</span>
+          <span class="name">${item.name}</span>
         `;
         grid.appendChild(btn);
       });
     }
 
-    // 選択・解除切り替え
+    // 選択・解除切り替え（タブを切り替えても選択状態は保持される）
     function toggleSelect(element, choreName) {
-      if (!isReady) return;
-
       if (selectedChores.has(choreName)) {
         selectedChores.delete(choreName);
         element.classList.remove('selected');
@@ -198,41 +215,20 @@
       updateSubmitButton();
     }
 
-    // 送信ボタンの状態更新
     function updateSubmitButton() {
       const submitBtn = document.getElementById('submitBtn');
       const count = selectedChores.size;
-
-      if (count > 0) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = `家事を記録する (${count})`;
-      } else {
-        submitBtn.disabled = true;
-        submitBtn.textContent = `家事を記録する (0)`;
-      }
+      submitBtn.disabled = count === 0;
+      submitBtn.textContent = `家事を記録する (${count})`;
     }
 
-    // 選択された家事を一括送信
     function sendChores() {
-      if (!isReady) return;
+      if (!liff.isInClient() || selectedChores.size === 0) return;
 
-      if (!liff.isInClient()) {
-        alert("LINEアプリ内のトーク画面から開いてください。");
-        return;
-      }
-
-      if (selectedChores.size === 0) return;
-
-      // 改行区切りで結合（GAS側で一括分解される）
       const textToSend = Array.from(selectedChores).join('\n');
-
       liff.sendMessages([{ type: 'text', text: textToSend }])
-        .then(() => {
-          liff.closeWindow();
-        })
-        .catch((err) => {
-          alert("送信エラー: " + err.message);
-        });
+        .then(() => liff.closeWindow())
+        .catch(err => alert("送信エラー: " + err.message));
     }
   </script>
 </body>
