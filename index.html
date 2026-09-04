@@ -65,6 +65,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
     .chore-card.selected {
       background-color: #06C755;
@@ -77,6 +79,7 @@
       top: 6px;
       right: 8px;
       font-size: 12px;
+      font-weight: bold;
     }
     .chore-card.selected .check-icon { display: block; }
 
@@ -121,20 +124,28 @@
 
   <script>
     const MY_LIFF_ID = "2011411807-WdTV4hX7";
+    // ★ご自身のGASのデプロイURLを設定してください
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzlAFbG5mz0uS1s-I5TjM3foKAIzvOSsnYHsoSBnLRod4VlVJeL3n5lVYxfomUEfHyQrg/exec";
 
-    let allChores = [];             // 取得した全家事データ { name, category }
-    let currentCategory = 'すべて';  // 現在選択中のカテゴリ
-    const selectedChores = new Set(); // 選択中の家事名Set
+    let allChores = [];               // オブジェクト配列 [{ name, category }, ...] を保持
+    let currentCategory = 'すべて';    // 選択中のカテゴリ
+    const selectedChores = new Set();  // 選択中の家事名セット
 
     window.onload = function() {
-      if (typeof liff === 'undefined') return;
+      if (typeof liff === 'undefined') {
+        document.getElementById('status').innerText = "エラー: LIFF SDKが読み込めません";
+        return;
+      }
 
-      liff.init({ liffId: MY_LIFF_ID }).then(() => {
-        const context = liff.getContext();
-        const groupId = context ? (context.groupId || context.roomId || context.userId || '') : '';
-        fetchGroupChores(groupId);
-      });
+      liff.init({ liffId: MY_LIFF_ID })
+        .then(() => {
+          const context = liff.getContext();
+          const groupId = context ? (context.groupId || context.roomId || context.userId || '') : '';
+          fetchGroupChores(groupId);
+        })
+        .catch(err => {
+          document.getElementById('status').innerText = "初期化失敗: " + err.message;
+        });
     };
 
     function fetchGroupChores(groupId) {
@@ -144,23 +155,28 @@
       fetch(url)
         .then(res => res.json())
         .then(data => {
+          // オブジェクト配列かつ要素数が1以上あるか判定
           if (Array.isArray(data) && data.length > 0) {
             allChores = data;
             statusEl.innerText = "家事を選択してください（複数可）";
             renderCategories();
             renderCards();
           } else {
-            statusEl.innerText = "家事マスタが登録されていません";
+            statusEl.innerText = "登録されている家事マスタがありません";
           }
+        })
+        .catch(err => {
+          console.error("取得エラー:", err);
+          statusEl.innerText = "データ取得エラーが発生しました";
         });
     }
 
-    // ① カテゴリタブの動的生成
+    // カテゴリタブの動的生成
     function renderCategories() {
       const tabsContainer = document.getElementById('categoryTabs');
       tabsContainer.innerHTML = '';
 
-      // 重複なしのカテゴリ一覧を作成（先頭に「すべて」を追加）
+      // 重複なしのカテゴリ配列を作成（先頭に「すべて」を追加）
       const categories = ['すべて', ...new Set(allChores.map(c => c.category))];
 
       categories.forEach(cat => {
@@ -169,22 +185,20 @@
         btn.textContent = cat;
         btn.onclick = () => {
           currentCategory = cat;
-          // タブのアクティブ表示切替
           document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          // カード一覧を再描画
           renderCards();
         };
         tabsContainer.appendChild(btn);
       });
     }
 
-    // ② 家事カードの表示（絞り込み表示）
+    // 家事カードの絞り込み描画
     function renderCards() {
       const grid = document.getElementById('choreGrid');
       grid.innerHTML = '';
 
-      // 選択中カテゴリに合わせてフィルタリング
+      // 選択中カテゴリでフィルタリング（"食事", "洗濯", "掃除"など）
       const filtered = currentCategory === 'すべて' 
         ? allChores 
         : allChores.filter(c => c.category === currentCategory);
@@ -203,7 +217,7 @@
       });
     }
 
-    // 選択・解除切り替え（タブを切り替えても選択状態は保持される）
+    // カードの選択・解除切り替え
     function toggleSelect(element, choreName) {
       if (selectedChores.has(choreName)) {
         selectedChores.delete(choreName);
@@ -215,6 +229,7 @@
       updateSubmitButton();
     }
 
+    // 下部ボタン表示更新
     function updateSubmitButton() {
       const submitBtn = document.getElementById('submitBtn');
       const count = selectedChores.size;
@@ -222,6 +237,7 @@
       submitBtn.textContent = `家事を記録する (${count})`;
     }
 
+    // 選択家事の一括送信
     function sendChores() {
       if (!liff.isInClient() || selectedChores.size === 0) return;
 
