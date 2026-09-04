@@ -133,15 +133,19 @@
   </div>
 
   <script>
-    // エラーログを画面に直接出す設定
-    window.onerror = function(msg, url, line) {
-      const statusEl = document.getElementById('status');
-      statusEl.className = 'error-msg';
-      statusEl.innerText = "JSエラーが発生しました:\n" + msg + "\n(LINE: " + line + ")";
-      return false;
-    };
+    // ★エラーが起きたら画面上に赤文字で出力するデバッグコード
+  window.onerror = function(msg, url, line) {
+    const statusEl = document.getElementById('status');
+    if (statusEl) {
+      statusEl.style.color = 'red';
+      statusEl.innerText = "エラー発生: " + msg + " (行: " + line + ")";
+    }
+    return false;
+  };
 
-    const MY_LIFF_ID = "2011411807-WdTV4hX7";
+  const MY_LIFF_ID = "2011411807-WdTV4hX7";
+  // ... 以下既存のコード
+
     
     // ★★★ 注意: クォーテーションを重ねず、以下のように正しく記述してください ★★★
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzlAFbG5mz0uS1s-I5TjM3foKAIzvOSsnYHsoSBnLRod4VlVJeL3n5lVYxfomUEfHyQrg/exec";
