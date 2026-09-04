@@ -19,7 +19,7 @@
       text-align: center;
     }
 
-    /* ① カテゴリ選択タブエリア */
+    /* タブエリア */
     .category-tabs {
       display: flex;
       gap: 8px;
@@ -45,7 +45,7 @@
       color: #ffffff;
     }
 
-    /* ② 家事カード一覧エリア */
+    /* 家事カード一覧 */
     .grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -79,11 +79,10 @@
       top: 6px;
       right: 8px;
       font-size: 12px;
-      font-weight: bold;
     }
     .chore-card.selected .check-icon { display: block; }
 
-    /* 下部固定フッター */
+    /* フッター */
     .footer {
       position: fixed;
       bottom: 0; left: 0; right: 0;
@@ -109,13 +108,13 @@
 
   <div id="status">家事マスタを読み込み中...</div>
 
-  <!-- カテゴリタブ一覧エリア -->
+  <!-- カテゴリタブ -->
   <div class="category-tabs" id="categoryTabs"></div>
 
-  <!-- 家事カード一覧エリア -->
+  <!-- 家事カード一覧 -->
   <div class="grid" id="choreGrid"></div>
 
-  <!-- 送信ボタン -->
+  <!-- 下部送信ボタン -->
   <div class="footer">
     <button id="submitBtn" class="submit-btn" disabled onclick="sendChores()">
       家事を記録する (0)
@@ -124,12 +123,12 @@
 
   <script>
     const MY_LIFF_ID = "2011411807-WdTV4hX7";
-    // ★ご自身のGASのデプロイURLを設定してください
+    // ★ここをご自身のGASウェブアプリURLに置き換えてください
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzlAFbG5mz0uS1s-I5TjM3foKAIzvOSsnYHsoSBnLRod4VlVJeL3n5lVYxfomUEfHyQrg/exec";
 
-    let allChores = [];               // オブジェクト配列 [{ name, category }, ...] を保持
-    let currentCategory = 'すべて';    // 選択中のカテゴリ
-    const selectedChores = new Set();  // 選択中の家事名セット
+    let allChores = [];
+    let currentCategory = 'すべて';
+    const selectedChores = new Set();
 
     window.onload = function() {
       if (typeof liff === 'undefined') {
@@ -155,29 +154,32 @@
       fetch(url)
         .then(res => res.json())
         .then(data => {
-          // オブジェクト配列かつ要素数が1以上あるか判定
           if (Array.isArray(data) && data.length > 0) {
             allChores = data;
             statusEl.innerText = "家事を選択してください（複数可）";
             renderCategories();
             renderCards();
           } else {
-            statusEl.innerText = "登録されている家事マスタがありません";
+            statusEl.innerText = "家事マスタが登録されていません";
           }
         })
         .catch(err => {
           console.error("取得エラー:", err);
-          statusEl.innerText = "データ取得エラーが発生しました";
+          statusEl.innerText = "データ取得エラーが発生しました: " + err.message;
         });
     }
 
-    // カテゴリタブの動的生成
     function renderCategories() {
       const tabsContainer = document.getElementById('categoryTabs');
       tabsContainer.innerHTML = '';
 
-      // 重複なしのカテゴリ配列を作成（先頭に「すべて」を追加）
-      const categories = ['すべて', ...new Set(allChores.map(c => c.category))];
+      // カテゴリ一覧を抽出（重複除去）
+      const categories = ['すべて'];
+      allChores.forEach(item => {
+        if (item.category && !categories.includes(item.category)) {
+          categories.push(item.category);
+        }
+      });
 
       categories.forEach(cat => {
         const btn = document.createElement('button');
@@ -193,12 +195,10 @@
       });
     }
 
-    // 家事カードの絞り込み描画
     function renderCards() {
       const grid = document.getElementById('choreGrid');
       grid.innerHTML = '';
 
-      // 選択中カテゴリでフィルタリング（"食事", "洗濯", "掃除"など）
       const filtered = currentCategory === 'すべて' 
         ? allChores 
         : allChores.filter(c => c.category === currentCategory);
@@ -217,7 +217,6 @@
       });
     }
 
-    // カードの選択・解除切り替え
     function toggleSelect(element, choreName) {
       if (selectedChores.has(choreName)) {
         selectedChores.delete(choreName);
@@ -229,7 +228,6 @@
       updateSubmitButton();
     }
 
-    // 下部ボタン表示更新
     function updateSubmitButton() {
       const submitBtn = document.getElementById('submitBtn');
       const count = selectedChores.size;
@@ -237,7 +235,6 @@
       submitBtn.textContent = `家事を記録する (${count})`;
     }
 
-    // 選択家事の一括送信
     function sendChores() {
       if (!liff.isInClient() || selectedChores.size === 0) return;
 
