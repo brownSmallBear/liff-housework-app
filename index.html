@@ -164,7 +164,10 @@
         .then(() => {
           const context = liff.getContext();
           const groupId = context ? (context.groupId || context.roomId || context.userId || '') : '';
-          
+          (!groupId) {
+          // ★ここに管理台帳（スプレッドシート）のA列に書いてあるグループIDを直接貼り付けてテスト
+            targetGroupId = "C5d26c0e5882bc843b9d72e20563cd2a0";
+          }
           document.getElementById('status').innerText = "データ取得中...";
           fetchGroupChores(groupId);
         })
