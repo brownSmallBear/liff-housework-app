@@ -113,7 +113,16 @@
     }
     .submit-btn:disabled { background-color: #ccc; cursor: not-allowed; }
   </style>
+  <!-- 1. LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <!-- 2. vConsole（デバッグ用ライブラリ） -->
+  <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
+
+  <!-- 3. vConsoleの初期化 -->
+  <script>
+    var vConsole = new VConsole();
+  </script>
 </head>
 <body>
 
@@ -160,9 +169,13 @@
         return;
       }
 
+
+      
       liff.init({ liffId: MY_LIFF_ID })
         .then(() => {
           const context = liff.getContext();
+          console.log("Context全体:", context);
+          console.log("取得したgroupId:", context ? context.groupId : null);
           let groupId = "C5d26c0e5882bc843b9d72e20563cd2a0";
           //(!groupId) {
           // ★ここに管理台帳（スプレッドシート）のA列に書いてあるグループIDを直接貼り付けてテスト
